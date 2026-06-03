@@ -31,29 +31,31 @@ export function authUrl(req, res) {
  * Exchange code → access_token, lalu redirect ke frontend.
  */
 export async function authCallback(req, res, next) {
-  const { code, error } = req.query;
+  const { code, error, shop_id } = req.query;
 
   if (error || !code) {
     const fe = process.env.FRONTEND_URL || 'https://marketing-hub-fe.vercel.app';
-    return res.redirect(`${fe}/shopee-auth-error?error=${error || 'no_code'}`);
+    return res.redirect(`${fe}?shopee_auth_error=${error || 'no_code'}`);
   }
 
   try {
-    const data = await getAccessToken(code);
-    // Simpan token ke env tidak bisa di runtime — redirect ke frontend dengan token
-    // Frontend akan kirim ke backend untuk disimpan ke store sementara (atau user copy)
+    // Pass shop_id jika ada (Shop auth flow)
+    const data = await getAccessToken(code, shop_id || null);
+
     const fe     = process.env.FRONTEND_URL || 'https://marketing-hub-fe.vercel.app';
     const params = new URLSearchParams({
       access_token:  data.access_token  || '',
       refresh_token: data.refresh_token || '',
-      expire_in:     data.expire_in     || 14400,
-      // shop_id & user_id — ambil yang pertama jika seller
-      shop_id:  (data.shop_id_list?.[0]  || data.shop_id  || '').toString(),
-      user_id:  (data.user_id_list?.[0]  || data.user_id  || '').toString(),
+      expire_in:     String(data.expire_in || 14400),
+      shop_id:  String(data.shop_id_list?.[0] || shop_id || data.shop_id || ''),
+      user_id:  String(data.user_id_list?.[0] || data.user_id || ''),
     });
     return res.redirect(`${fe}?shopee_auth=1&${params.toString()}`);
   } catch (err) {
-    next(err);
+    // Redirect ke frontend dengan pesan error agar tidak stuck di halaman kosong
+    const fe = process.env.FRONTEND_URL || 'https://marketing-hub-fe.vercel.app';
+    console.error('[Shopee Auth]', err.message);
+    return res.redirect(`${fe}?shopee_auth_error=${encodeURIComponent(err.message)}`);
   }
 }
 

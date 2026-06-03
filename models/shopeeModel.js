@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import fetch  from 'node-fetch';
 import {
   SHOPEE_BASE,
+  SHOPEE_AUTH_BASE,
   SHOPEE_PARTNER_ID,
   SHOPEE_PARTNER_KEY,
 } from '../config.js';
@@ -83,6 +84,23 @@ async function shopeePost(apiPath, query, body) {
   return data;
 }
 
+// Auth calls pakai open.shopee.com (bukan partner.shopeemobile.com)
+async function shopeeAuthPost(apiPath, query, body) {
+  const url  = `${SHOPEE_AUTH_BASE}${apiPath}?${query}`;
+  const res  = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (data.error && data.error !== '') {
+    const err  = new Error(data.message || data.error);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
 // ── Auth: Generate authorization URL ─────────────────
 
 export function getAuthUrl(redirectUri, authType = 'seller') {
@@ -109,22 +127,27 @@ export function getAuthUrl(redirectUri, authType = 'seller') {
 
 // ── Auth: Exchange code for access_token ──────────────
 
-export async function getAccessToken(code) {
+export async function getAccessToken(code, shopId = null) {
   const apiPath = '/api/v2/public/get_access_token';
   const query   = buildPublicQuery(apiPath);
-  return shopeePost(apiPath, query, { code, partner_id: SHOPEE_PARTNER_ID });
+  const body    = { code, partner_id: SHOPEE_PARTNER_ID };
+  // Jika dari Shop auth (bukan Livestream), sertakan shop_id
+  if (shopId) body.shop_id = parseInt(shopId, 10);
+  return shopeeAuthPost(apiPath, query, body);
 }
 
 // ── Auth: Refresh access_token ────────────────────────
 
-export async function refreshAccessToken(refreshToken, userId) {
+export async function refreshAccessToken(refreshToken, userId, shopId = null) {
   const apiPath = '/api/v2/public/refresh_access_token';
   const query   = buildPublicQuery(apiPath);
-  return shopeePost(apiPath, query, {
+  const body    = {
     refresh_token: refreshToken,
     partner_id:    SHOPEE_PARTNER_ID,
-    user_id:       userId,
-  });
+  };
+  if (userId)  body.user_id  = parseInt(userId, 10);
+  if (shopId)  body.shop_id  = parseInt(shopId, 10);
+  return shopeeAuthPost(apiPath, query, body);
 }
 
 // ── Livestream: Session ───────────────────────────────
