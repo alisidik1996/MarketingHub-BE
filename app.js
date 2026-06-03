@@ -7,6 +7,7 @@
 import express from 'express';
 import cors    from 'cors';
 import metaRoutes        from './routes/meta.js';
+import shopeeRoutes      from './routes/shopee.js';
 import { errorHandler }  from './middleware/errorHandler.js';
 import { rateLimit }     from './middleware/rateLimit.js';
 
@@ -37,7 +38,8 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
-app.use('/api/meta', metaRoutes);
+app.use('/api/meta',   metaRoutes);
+app.use('/api/shopee', shopeeRoutes);
 app.use(errorHandler);
 
 // Local dev — jalankan server jika dipanggil langsung
