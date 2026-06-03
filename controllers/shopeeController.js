@@ -20,7 +20,9 @@ import { SHOPEE_REDIRECT_URI } from '../config.js';
  * Return authorization URL untuk diarahkan ke browser
  */
 export function authUrl(req, res) {
-  const authType = req.query.auth_type || 'seller';
+  // Livestream API butuh user_id — gunakan auth_type=user
+  // seller juga bisa pakai auth_type=user untuk mendapatkan user_id
+  const authType = req.query.auth_type || 'user';
   const url = getAuthUrl(SHOPEE_REDIRECT_URI, authType);
   res.json({ url });
 }
@@ -52,7 +54,6 @@ export async function authCallback(req, res, next) {
     const refresh_token = resp.refresh_token || data.refresh_token || '';
     const expire_in     = resp.expire_in     || data.expire_in     || 14400;
 
-    // shop_id_list dan user_id_list ada di root response (bukan dalam .response)
     const shop_id_list  = data.shop_id_list  || resp.shop_id_list  || [];
     const user_id_list  = data.user_id_list  || resp.user_id_list  || [];
 
