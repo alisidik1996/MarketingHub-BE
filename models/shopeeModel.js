@@ -108,15 +108,17 @@ export async function upsertSessions(records, importedBy = 'manual') {
   return { count: data?.length || 0 };
 }
 
-export async function getSessions({ shop_id, limit = 100, offset = 0, search = '' } = {}) {
+export async function getSessions({ shop_id, limit = 100, offset = 0, search = '', since = '', until = '' } = {}) {
   let query = supabase
     .from('shopee_livestream_sessions')
-    .select('*')
+    .select('*', { count: 'exact' })
     .order('start_date', { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (shop_id)  query = query.eq('shop_id', shop_id);
-  if (search)   query = query.ilike('livestream_name', `%${search}%`);
+  if (shop_id) query = query.eq('shop_id', shop_id);
+  if (search)  query = query.ilike('livestream_name', `%${search}%`);
+  if (since)   query = query.gte('start_date', since);
+  if (until)   query = query.lte('start_date', until + 'T23:59:59');
 
   const { data, error, count } = await query;
   if (error) throw new Error('Supabase query error: ' + error.message);
@@ -134,12 +136,14 @@ export async function getSessionById(sessionId) {
   return data;
 }
 
-export async function getSummaryStats(shop_id) {
+export async function getSummaryStats(shop_id, since = '', until = '') {
   let query = supabase
     .from('shopee_livestream_sessions')
     .select('total_views,unique_viewers,orders,gross_sales_local,net_sales_local,units_sold,buyers,likes,comments,new_followers,duration_minutes');
 
   if (shop_id) query = query.eq('shop_id', shop_id);
+  if (since)   query = query.gte('start_date', since);
+  if (until)   query = query.lte('start_date', until + 'T23:59:59');
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);

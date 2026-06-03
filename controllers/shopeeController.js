@@ -33,12 +33,14 @@ export async function uploadReport(req, res, next) {
 // GET /api/shopee/sessions
 export async function listSessions(req, res, next) {
   try {
-    const { shop_id, limit, offset, search } = req.query;
+    const { shop_id, limit, offset, search, since, until } = req.query;
     const result = await getSessions({
       shop_id: shop_id ? parseInt(shop_id, 10) : null,
-      limit:   limit  ? parseInt(limit, 10)  : 100,
-      offset:  offset ? parseInt(offset, 10) : 0,
+      limit:   limit  ? parseInt(limit, 10)   : 1000,
+      offset:  offset ? parseInt(offset, 10)  : 0,
       search:  search || '',
+      since:   since  || '',
+      until:   until  || '',
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -55,8 +57,12 @@ export async function getSession(req, res, next) {
 // GET /api/shopee/summary
 export async function getSummary(req, res, next) {
   try {
-    const { shop_id } = req.query;
-    const data = await getSummaryStats(shop_id ? parseInt(shop_id, 10) : null);
+    const { shop_id, since, until } = req.query;
+    const data = await getSummaryStats(
+      shop_id ? parseInt(shop_id, 10) : null,
+      since || '',
+      until || '',
+    );
     res.json(data);
   } catch (err) { next(err); }
 }
