@@ -5,6 +5,7 @@ import {
   getAuthUrl,
   getAccessToken,
   refreshAccessToken,
+  getShopInfo,
   getSessionDetail,
   getSessionMetric,
   getSessionItemMetric,
@@ -20,9 +21,9 @@ import { SHOPEE_REDIRECT_URI } from '../config.js';
  * Return authorization URL untuk diarahkan ke browser
  */
 export function authUrl(req, res) {
-  // Livestream API butuh user_id — gunakan auth_type=user
-  // seller juga bisa pakai auth_type=user untuk mendapatkan user_id
-  const authType = req.query.auth_type || 'user';
+  // auth_type=seller untuk Shop app (standar)
+  // auth_type=user hanya untuk Livestream Management app
+  const authType = req.query.auth_type || 'seller';
   const url = getAuthUrl(SHOPEE_REDIRECT_URI, authType);
   res.json({ url });
 }
@@ -61,7 +62,22 @@ export async function authCallback(req, res, next) {
     console.log('[Shopee Auth] user_id_list:', user_id_list);
 
     const shop_id_out   = shop_id_list[0] || resp.shop_id || data.shop_id || shop_id || '';
-    const user_id_out   = user_id_list[0] || resp.user_id || data.user_id || '';
+    let   user_id_out   = user_id_list[0] || resp.user_id || data.user_id || '';
+
+    // Jika user_id tidak ada (seller auth), coba ambil dari shop_info
+    if (!user_id_out && shop_id_out && access_token) {
+      try {
+        const shopInfo = await getShopInfo(access_token, shop_id_out);
+        console.log('[Shopee Auth] shop_info:', JSON.stringify(shopInfo));
+        // shop_info biasanya return user_id di response
+        user_id_out = shopInfo?.response?.user_id ||
+                      shopInfo?.user_id            ||
+                      shopInfo?.response?.owner_user_id || '';
+        console.log('[Shopee Auth] user_id from shop_info:', user_id_out);
+      } catch (e) {
+        console.warn('[Shopee Auth] gagal ambil user_id dari shop_info:', e.message);
+      }
+    }
 
     const fe     = process.env.FRONTEND_URL || 'https://marketing-hub-fe.vercel.app';
     const params = new URLSearchParams({

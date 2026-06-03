@@ -181,6 +181,14 @@ export async function refreshAccessToken(refreshToken, userId, shopId = null) {
 }
 
 // ── Livestream: Session ───────────────────────────────
+// ── Get shop info (untuk ambil user_id dari shop auth) ────
+
+export async function getShopInfo(accessToken, shopId) {
+  const apiPath = '/api/v2/shop/get_shop_info';
+  const query   = buildShopQuery(apiPath, accessToken, shopId);
+  console.log('[Shopee] GET shop info for shop_id:', shopId);
+  return shopeeGet(apiPath, query);
+}
 // Shopee Livestream API butuh user_id, tapi jika hanya punya shop_id
 // kita coba pakai shop_id sebagai user_id (beberapa endpoint support ini)
 
