@@ -33,7 +33,7 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
-app.use('/api', metaRoutes);
+app.use('/api/meta', metaRoutes);
 app.use(errorHandler);
 
 // Local dev — jalankan server jika dipanggil langsung
