@@ -70,13 +70,18 @@ async function shopeeGet(apiPath, query) {
 
 async function shopeePost(apiPath, query, body) {
   const url  = `${SHOPEE_BASE}${apiPath}?${query}`;
+  console.log('[Shopee] POST', url, JSON.stringify(body));
   const res  = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
   });
-  const data = await res.json();
-  if (data.error && data.error !== '') {
+  const rawText = await res.text();
+  console.log('[Shopee] Raw response:', rawText.slice(0, 500));
+  let data;
+  try { data = JSON.parse(rawText); }
+  catch { throw new Error(`Response bukan JSON (HTTP ${res.status}): ${rawText.slice(0, 200)}`); }
+  if (data.error && data.error !== '' && data.error !== 'success') {
     const err  = new Error(data.message || data.error);
     err.status = res.status;
     throw err;
@@ -93,9 +98,17 @@ async function shopeeAuthPost(apiPath, query, body) {
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
   });
-  const data = await res.json();
-  console.log('[Shopee] Response:', JSON.stringify(data));
-  // Hanya throw jika benar-benar ada error (bukan string kosong)
+
+  const rawText = await res.text();
+  console.log('[Shopee] Raw response:', rawText.slice(0, 500));
+
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    throw new Error(`Shopee response bukan JSON (HTTP ${res.status}): ${rawText.slice(0, 200)}`);
+  }
+
   if (data.error && data.error !== '' && data.error !== 'success') {
     const err  = new Error(data.message || data.error);
     err.status = res.status;
@@ -131,18 +144,20 @@ export function getAuthUrl(redirectUri, authType = 'seller') {
 // ── Auth: Exchange code for access_token ──────────────
 
 export async function getAccessToken(code, shopId = null) {
-  const apiPath = '/api/v2/public/get_access_token';
+  // Shopee v2 standard: partner.shopeemobile.com/api/v2/auth/token/get
+  const apiPath = '/api/v2/auth/token/get';
   const query   = buildPublicQuery(apiPath);
   const body    = { code, partner_id: SHOPEE_PARTNER_ID };
-  // Jika dari Shop auth (bukan Livestream), sertakan shop_id
   if (shopId) body.shop_id = parseInt(shopId, 10);
-  return shopeeAuthPost(apiPath, query, body);
+  // Pakai SHOPEE_BASE (partner.shopeemobile.com) bukan open.shopee.com
+  return shopeePost(apiPath, query, body);
 }
 
 // ── Auth: Refresh access_token ────────────────────────
 
 export async function refreshAccessToken(refreshToken, userId, shopId = null) {
-  const apiPath = '/api/v2/public/refresh_access_token';
+  // Shopee v2 standard: /api/v2/auth/access_token/get
+  const apiPath = '/api/v2/auth/access_token/get';
   const query   = buildPublicQuery(apiPath);
   const body    = {
     refresh_token: refreshToken,
@@ -150,7 +165,7 @@ export async function refreshAccessToken(refreshToken, userId, shopId = null) {
   };
   if (userId)  body.user_id  = parseInt(userId, 10);
   if (shopId)  body.shop_id  = parseInt(shopId, 10);
-  return shopeeAuthPost(apiPath, query, body);
+  return shopeePost(apiPath, query, body);
 }
 
 // ── Livestream: Session ───────────────────────────────
