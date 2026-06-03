@@ -1,5 +1,5 @@
 /**
- * Meta routes — binds HTTP endpoints to controller methods.
+ * Meta Routes — bind endpoints ke controller.
  */
 import { Router } from 'express';
 import { requireToken } from '../middleware/auth.js';
@@ -15,11 +15,11 @@ import {
 
 const router = Router();
 
-// Token management (no auth required — uses app credentials)
+// Token (no auth)
 router.post('/token/inspect', tokenInspect);
 router.post('/token/extend',  tokenExtend);
 
-// Protected Meta data endpoints
+// Protected
 router.post('/account',   requireToken, account);
 router.post('/campaigns', requireToken, campaigns);
 router.post('/insights',  requireToken, insights);

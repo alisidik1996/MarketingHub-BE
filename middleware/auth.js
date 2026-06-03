@@ -1,5 +1,5 @@
 /**
- * Auth middleware — extracts Meta token from header or body.
+ * Auth middleware — extract Meta token dari header atau body.
  */
 export function requireToken(req, res, next) {
   const token = req.headers['x-meta-token'] || req.body?.token;

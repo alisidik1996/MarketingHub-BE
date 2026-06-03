@@ -1,6 +1,5 @@
 /**
- * Centralized error handler middleware.
- * Must be registered last: app.use(errorHandler)
+ * Global error handler — harus di-register paling terakhir.
  */
 export function errorHandler(err, _req, res, _next) {
   console.error('[ERROR]', err.message);

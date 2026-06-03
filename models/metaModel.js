@@ -1,7 +1,6 @@
 /**
- * Meta Graph API service layer.
- * Handles all direct communication with the Meta Graph API.
- * No Express req/res here — pure data access functions.
+ * Meta Model — semua komunikasi langsung ke Meta Graph API.
+ * Tidak ada Express req/res di sini, hanya data access.
  */
 import fetch from 'node-fetch';
 import {
@@ -9,7 +8,7 @@ import {
   APP_ID,
   APP_SECRET,
   CPAS_EXTRA_FIELDS,
-} from '../config/meta.js';
+} from '../config.js';
 
 // ── Core fetch helpers ────────────────────────────────
 
@@ -42,7 +41,7 @@ export async function graphGetAll(path, params = {}) {
   return results;
 }
 
-// ── Token services ────────────────────────────────────
+// ── Token ─────────────────────────────────────────────
 
 export async function inspectToken(token) {
   const url = new URL(`${META_BASE}/debug_token`);
@@ -63,10 +62,10 @@ export async function extendToken(token) {
   const res  = await fetch(url.toString());
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data; // { access_token, token_type, expires_in }
+  return data;
 }
 
-// ── Account & campaign services ───────────────────────
+// ── Account & campaigns ───────────────────────────────
 
 export async function getAccount(accountId, token) {
   return graphGet(`/act_${accountId}`, {
@@ -95,7 +94,7 @@ export async function getInsights(accountId, { fields, since, until, level, time
   return graphGetAll(`/act_${accountId}/insights`, params);
 }
 
-// ── Ad sets & ads services ────────────────────────────
+// ── Ad sets & ads ─────────────────────────────────────
 
 export async function getAdSets(campaignId, { since, until, isCpas }, token) {
   const insightFields = isCpas
