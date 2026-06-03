@@ -8,6 +8,7 @@ import express from 'express';
 import cors    from 'cors';
 import metaRoutes        from './routes/meta.js';
 import { errorHandler }  from './middleware/errorHandler.js';
+import { rateLimit }     from './middleware/rateLimit.js';
 
 const app = express();
 
@@ -28,6 +29,9 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
+
+// Rate limit: 60 requests per menit per IP
+app.use(rateLimit(60, 60_000));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
