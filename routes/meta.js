@@ -19,6 +19,13 @@ const router = Router();
 router.post('/token/inspect', tokenInspect);
 router.post('/token/extend',  tokenExtend);
 
+// Serve fallback token dari env ke frontend (GET, no auth)
+router.get('/token/fallback', (_req, res) => {
+  const token = process.env.META_FALLBACK_TOKEN || '';
+  if (!token) return res.status(404).json({ error: 'Fallback token tidak dikonfigurasi' });
+  res.json({ token });
+});
+
 // Protected
 router.post('/account',   requireToken, account);
 router.post('/campaigns', requireToken, campaigns);
