@@ -42,13 +42,26 @@ export async function authCallback(req, res, next) {
     // Pass shop_id jika ada (Shop auth flow)
     const data = await getAccessToken(code, shop_id || null);
 
+    // Log response untuk debug
+    console.log('[Shopee Auth] get_access_token response:', JSON.stringify(data));
+
+    // Shopee v2 bisa return di root level atau dalam response field
+    const resp         = data.response || data;
+    const access_token = resp.access_token  || data.access_token  || '';
+    const refresh_token= resp.refresh_token || data.refresh_token || '';
+    const expire_in    = resp.expire_in     || data.expire_in     || 14400;
+    const shop_id_out  = resp.shop_id_list?.[0] || resp.shop_id ||
+                         data.shop_id_list?.[0] || shop_id || '';
+    const user_id_out  = resp.user_id_list?.[0] || resp.user_id ||
+                         data.user_id_list?.[0] || data.user_id  || '';
+
     const fe     = process.env.FRONTEND_URL || 'https://marketing-hub-fe.vercel.app';
     const params = new URLSearchParams({
-      access_token:  data.access_token  || '',
-      refresh_token: data.refresh_token || '',
-      expire_in:     String(data.expire_in || 14400),
-      shop_id:  String(data.shop_id_list?.[0] || shop_id || data.shop_id || ''),
-      user_id:  String(data.user_id_list?.[0] || data.user_id || ''),
+      access_token:  access_token,
+      refresh_token: refresh_token,
+      expire_in:     String(expire_in),
+      shop_id:       String(shop_id_out),
+      user_id:       String(user_id_out),
     });
     return res.redirect(`${fe}?shopee_auth=1&${params.toString()}`);
   } catch (err) {

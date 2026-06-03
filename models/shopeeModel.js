@@ -87,13 +87,16 @@ async function shopeePost(apiPath, query, body) {
 // Auth calls pakai open.shopee.com (bukan partner.shopeemobile.com)
 async function shopeeAuthPost(apiPath, query, body) {
   const url  = `${SHOPEE_AUTH_BASE}${apiPath}?${query}`;
+  console.log('[Shopee] POST', url, JSON.stringify(body));
   const res  = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
   });
   const data = await res.json();
-  if (data.error && data.error !== '') {
+  console.log('[Shopee] Response:', JSON.stringify(data));
+  // Hanya throw jika benar-benar ada error (bukan string kosong)
+  if (data.error && data.error !== '' && data.error !== 'success') {
     const err  = new Error(data.message || data.error);
     err.status = res.status;
     throw err;
