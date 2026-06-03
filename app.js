@@ -21,7 +21,6 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin (e.g. curl, Postman)
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
     callback(new Error(`CORS: origin ${origin} not allowed`));
@@ -29,7 +28,7 @@ app.use(cors({
   methods: ['GET', 'POST'],
   credentials: true,
 }));
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '10mb' })); // lebih besar untuk upload xlsx
 
 // Rate limit: 60 requests per menit per IP
 app.use(rateLimit(60, 60_000));
@@ -42,8 +41,6 @@ app.use('/api/meta',   metaRoutes);
 app.use('/api/shopee', shopeeRoutes);
 app.use(errorHandler);
 
-// Local dev — jalankan server jika dipanggil langsung
-// VERCEL_ENV di-set otomatis oleh Vercel, jadi kita skip listen di sana
 if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => {
@@ -52,5 +49,4 @@ if (!process.env.VERCEL) {
   });
 }
 
-// Vercel serverless export
 export default app;

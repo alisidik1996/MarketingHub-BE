@@ -1,232 +1,167 @@
 /**
- * Shopee Live API Model
- * Handles auth, signature, and all Shopee Live API calls.
- * Region: ID (Indonesia) — https://partner.shopeemobile.com
+ * Shopee Livestream Model
+ * Parse XLSX report dari Shopee dan simpan ke Supabase.
  */
-import crypto from 'crypto';
-import fetch  from 'node-fetch';
-import {
-  SHOPEE_BASE,
-  SHOPEE_AUTH_BASE,
-  SHOPEE_PARTNER_ID,
-  SHOPEE_PARTNER_KEY,
-} from '../config.js';
+import XLSX   from 'xlsx';
+import { supabase } from '../lib/supabase.js';
 
-// ── Signature helpers ─────────────────────────────────
+// ── Parse XLSX buffer → array of records ─────────────
 
-/**
- * Generate signature for PUBLIC endpoints (no access_token/user_id)
- * Base string: partner_id + api_path + timestamp
- */
-export function signPublic(apiPath, timestamp) {
-  const base = `${SHOPEE_PARTNER_ID}${apiPath}${timestamp}`;
-  return crypto.createHmac('sha256', SHOPEE_PARTNER_KEY)
-    .update(base)
-    .digest('hex');
-}
+export function parseXlsx(buffer) {
+  const wb = XLSX.read(buffer, { type: 'buffer' });
 
-/**
- * Generate signature for USER/LIVESTREAM endpoints
- * Base string: partner_id + api_path + timestamp + access_token + user_id
- */
-export function signUser(apiPath, timestamp, accessToken, userId) {
-  const base = `${SHOPEE_PARTNER_ID}${apiPath}${timestamp}${accessToken}${userId}`;
-  return crypto.createHmac('sha256', SHOPEE_PARTNER_KEY)
-    .update(base)
-    .digest('hex');
-}
+  // Cari sheet "By Livestream"
+  const sheetName = wb.SheetNames.find(n =>
+    n.toLowerCase().includes('livestream') || n.toLowerCase().includes('by')
+  ) || wb.SheetNames[0];
 
-/**
- * Build query string with common auth params (public endpoints)
- */
-function buildPublicQuery(apiPath) {
-  const ts   = Math.floor(Date.now() / 1000);
-  const sign = signPublic(apiPath, ts);
-  return `partner_id=${SHOPEE_PARTNER_ID}&timestamp=${ts}&sign=${sign}`;
-}
+  const ws   = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
-/**
- * Build query string with common auth params (user/livestream endpoints)
- * Base string: partner_id + api_path + timestamp + access_token + user_id
- */
-function buildUserQuery(apiPath, accessToken, userId) {
-  const ts   = Math.floor(Date.now() / 1000);
-  const sign = signUser(apiPath, ts, accessToken, userId);
-  return `partner_id=${SHOPEE_PARTNER_ID}&timestamp=${ts}&access_token=${accessToken}&user_id=${userId}&sign=${sign}`;
-}
+  if (rows.length < 2) throw new Error('Sheet kosong atau format tidak dikenali');
 
-/**
- * Build query string — Shop-type endpoints (pakai shop_id)
- * Base string: partner_id + api_path + timestamp + access_token + shop_id
- */
-function buildShopQuery(apiPath, accessToken, shopId) {
-  const ts   = Math.floor(Date.now() / 1000);
-  const base = `${SHOPEE_PARTNER_ID}${apiPath}${ts}${accessToken}${shopId}`;
-  const sign = crypto.createHmac('sha256', SHOPEE_PARTNER_KEY).update(base).digest('hex');
-  return `partner_id=${SHOPEE_PARTNER_ID}&timestamp=${ts}&access_token=${accessToken}&shop_id=${shopId}&sign=${sign}`;
-}
+  const headers = rows[0].map(h => String(h || '').trim());
+  const data    = rows.slice(1).filter(r => r.length > 0 && r[0]); // skip empty rows
 
-// ── Base fetch ────────────────────────────────────────
-
-async function shopeeGet(apiPath, query) {
-  const url  = `${SHOPEE_BASE}${apiPath}?${query}`;
-  const res  = await fetch(url);
-  const data = await res.json();
-  if (data.error && data.error !== '') {
-    const err  = new Error(data.message || data.error);
-    err.status = res.status;
-    throw err;
-  }
-  return data;
-}
-
-async function shopeePost(apiPath, query, body) {
-  const url  = `${SHOPEE_BASE}${apiPath}?${query}`;
-  console.log('[Shopee] POST', url, JSON.stringify(body));
-  const res  = await fetch(url, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
+  return data.map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = row[i] ?? null; });
+    return mapRow(obj);
   });
-  const rawText = await res.text();
-  console.log('[Shopee] Raw response:', rawText.slice(0, 500));
-  let data;
-  try { data = JSON.parse(rawText); }
-  catch { throw new Error(`Response bukan JSON (HTTP ${res.status}): ${rawText.slice(0, 200)}`); }
-  if (data.error && data.error !== '' && data.error !== 'success') {
-    const err  = new Error(data.message || data.error);
-    err.status = res.status;
-    throw err;
-  }
-  return data;
 }
 
-// Auth calls pakai open.shopee.com (bukan partner.shopeemobile.com)
-async function shopeeAuthPost(apiPath, query, body) {
-  const url  = `${SHOPEE_AUTH_BASE}${apiPath}?${query}`;
-  console.log('[Shopee] POST', url, JSON.stringify(body));
-  const res  = await fetch(url, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
-  });
-
-  const rawText = await res.text();
-  console.log('[Shopee] Raw response:', rawText.slice(0, 500));
-
-  let data;
-  try {
-    data = JSON.parse(rawText);
-  } catch {
-    throw new Error(`Shopee response bukan JSON (HTTP ${res.status}): ${rawText.slice(0, 200)}`);
-  }
-
-  if (data.error && data.error !== '' && data.error !== 'success') {
-    const err  = new Error(data.message || data.error);
-    err.status = res.status;
-    throw err;
-  }
-  return data;
-}
-
-// ── Auth: Generate authorization URL ─────────────────
-
-export function getAuthUrl(redirectUri, authType = 'seller') {
-  const apiPath = '/api/v2/shop/auth_partner';
-  const ts      = Math.floor(Date.now() / 1000);
-  const sign    = signPublic(apiPath, ts);
-  const params  = new URLSearchParams({
-    partner_id:    SHOPEE_PARTNER_ID,
-    timestamp:     ts,
-    sign,
-    redirect:      redirectUri,
-    auth_type:     authType,
-  });
-  // Untuk Livestream, gunakan open.shopee.com/auth (bukan shop/auth_partner)
-  const authBase = 'https://open.shopee.com/auth';
-  const liveParams = new URLSearchParams({
-    partner_id:    SHOPEE_PARTNER_ID,
-    auth_type:     authType,
-    redirect_uri:  redirectUri,
-    response_type: 'code',
-  });
-  return `${authBase}?${liveParams.toString()}`;
-}
-
-// ── Auth: Exchange code for access_token ──────────────
-
-export async function getAccessToken(code, shopId = null) {
-  // Shopee v2 standard: partner.shopeemobile.com/api/v2/auth/token/get
-  const apiPath = '/api/v2/auth/token/get';
-  const query   = buildPublicQuery(apiPath);
-  const body    = { code, partner_id: SHOPEE_PARTNER_ID };
-  if (shopId) body.shop_id = parseInt(shopId, 10);
-  // Pakai SHOPEE_BASE (partner.shopeemobile.com) bukan open.shopee.com
-  return shopeePost(apiPath, query, body);
-}
-
-// ── Auth: Refresh access_token ────────────────────────
-
-export async function refreshAccessToken(refreshToken, userId, shopId = null) {
-  // Shopee v2 standard: /api/v2/auth/access_token/get
-  const apiPath = '/api/v2/auth/access_token/get';
-  const query   = buildPublicQuery(apiPath);
-  const body    = {
-    refresh_token: refreshToken,
-    partner_id:    SHOPEE_PARTNER_ID,
+function mapRow(r) {
+  return {
+    region:              r['Region']              || '',
+    shop_name:           r['Shop Name']           || '',
+    shop_id:             toInt(r['Shop ID']),
+    livestream_name:     r['Livestream Name']     || '',
+    session_id:          toStr(r['Livestream Session ID']),
+    start_date:          parseDate(r['Start Date']),
+    total_views:         toInt(r['Total Views']),
+    unique_viewers:      toInt(r['Unique Viewers']),
+    duration_str:        r['Total Live Duration'] || '',
+    duration_minutes:    toFloat(r['Total Live Duration (in Minutes)']),
+    avg_duration_str:    r['Average Views Duration'] || '',
+    avg_duration_minutes:toFloat(r['Average Views Duration (in Minutes)']),
+    new_followers:       toInt(r['New Followers']),
+    likes:               toInt(r['Likes']),
+    comments:            toInt(r['Comments']),
+    buyers:              toInt(r['Buyers']),
+    atc_units:           toInt(r['ATC Units']),
+    units_sold:          toInt(r['Units Sold']),
+    orders:              toInt(r['Orders']),
+    gross_sales_usd:     toFloat(r['Gross Sales(USD)']),
+    gross_sales_local:   toFloat(r['Gross Sales(Local Currency)']),
+    net_sales_usd:       toFloat(r['Net Sales(USD)']),
+    net_sales_local:     toFloat(r['Net Sales(Local Currency)']),
+    conversion_rate:     toFloat(r['CR']),
   };
-  if (userId)  body.user_id  = parseInt(userId, 10);
-  if (shopId)  body.shop_id  = parseInt(shopId, 10);
-  return shopeePost(apiPath, query, body);
 }
 
-// ── Livestream: Session ───────────────────────────────
-// ── Get shop info (untuk ambil user_id dari shop auth) ────
+function toInt(v)   { const n = parseInt(v, 10);  return isNaN(n) ? 0 : n; }
+function toFloat(v) { const n = parseFloat(v);    return isNaN(n) ? 0 : n; }
+function toStr(v)   { return v != null ? String(v) : ''; }
 
-export async function getShopInfo(accessToken, shopId) {
-  const apiPath = '/api/v2/shop/get_shop_info';
-  const query   = buildShopQuery(apiPath, accessToken, shopId);
-  console.log('[Shopee] GET shop info for shop_id:', shopId);
-  return shopeeGet(apiPath, query);
-}
-// Shopee Livestream API butuh user_id, tapi jika hanya punya shop_id
-// kita coba pakai shop_id sebagai user_id (beberapa endpoint support ini)
-
-function buildQuery(apiPath, accessToken, userId, shopId) {
-  if (userId && userId !== '0' && userId !== '') {
-    return buildUserQuery(apiPath, accessToken, userId);
+function parseDate(v) {
+  if (!v) return null;
+  // Format dari Shopee: "10/05/2026 14:02" (DD/MM/YYYY HH:mm)
+  if (typeof v === 'string') {
+    const [datePart, timePart] = v.split(' ');
+    if (datePart) {
+      const [d, m, y] = datePart.split('/');
+      if (d && m && y) {
+        const iso = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}${timePart ? 'T'+timePart+':00' : ''}`;
+        return iso;
+      }
+    }
   }
-  // Fallback: pakai shop_id
-  return buildShopQuery(apiPath, accessToken, shopId);
+  // Excel serial number
+  if (typeof v === 'number') {
+    const date = XLSX.SSF.parse_date_code(v);
+    if (date) return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`;
+  }
+  return null;
 }
 
-export async function getSessionDetail(sessionId, accessToken, userId, shopId = '') {
-  const apiPath = '/api/v2/livestream/get_session_detail';
-  const query   = buildQuery(apiPath, accessToken, userId, shopId);
-  return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
+// ── Supabase operations ───────────────────────────────
+
+export async function upsertSessions(records, importedBy = 'manual') {
+  if (!records.length) return { inserted: 0, updated: 0 };
+
+  // Tambah metadata import
+  const withMeta = records.map(r => ({
+    ...r,
+    imported_at: new Date().toISOString(),
+    imported_by: importedBy,
+  }));
+
+  const { data, error } = await supabase
+    .from('shopee_livestream_sessions')
+    .upsert(withMeta, {
+      onConflict:        'session_id',
+      ignoreDuplicates:  false,
+    })
+    .select('session_id');
+
+  if (error) throw new Error('Supabase upsert error: ' + error.message);
+  return { count: data?.length || 0 };
 }
 
-export async function getSessionMetric(sessionId, accessToken, userId, shopId = '') {
-  const apiPath = '/api/v2/livestream/get_session_metric';
-  const query   = buildQuery(apiPath, accessToken, userId, shopId);
-  return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
+export async function getSessions({ shop_id, limit = 100, offset = 0, search = '' } = {}) {
+  let query = supabase
+    .from('shopee_livestream_sessions')
+    .select('*')
+    .order('start_date', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (shop_id)  query = query.eq('shop_id', shop_id);
+  if (search)   query = query.ilike('livestream_name', `%${search}%`);
+
+  const { data, error, count } = await query;
+  if (error) throw new Error('Supabase query error: ' + error.message);
+  return { data: data || [], count };
 }
 
-export async function getSessionItemMetric(sessionId, accessToken, userId, shopId = '') {
-  const apiPath = '/api/v2/livestream/get_session_item_metric';
-  const query   = buildQuery(apiPath, accessToken, userId, shopId);
-  return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
+export async function getSessionById(sessionId) {
+  const { data, error } = await supabase
+    .from('shopee_livestream_sessions')
+    .select('*')
+    .eq('session_id', sessionId)
+    .single();
+
+  if (error) throw new Error('Session tidak ditemukan: ' + error.message);
+  return data;
 }
 
-export async function getLatestComments(sessionId, accessToken, userId, shopId = '', lastCommentId = 0) {
-  const apiPath = '/api/v2/livestream/get_latest_comment_list';
-  const query   = buildQuery(apiPath, accessToken, userId, shopId);
-  const extra   = lastCommentId ? `&last_comment_id=${lastCommentId}` : '';
-  return shopeeGet(apiPath, `${query}&session_id=${sessionId}${extra}`);
-}
+export async function getSummaryStats(shop_id) {
+  let query = supabase
+    .from('shopee_livestream_sessions')
+    .select('total_views,unique_viewers,orders,gross_sales_local,net_sales_local,units_sold,buyers,likes,comments,new_followers,duration_minutes');
 
-export async function getItemList(sessionId, accessToken, userId, shopId = '') {
-  const apiPath = '/api/v2/livestream/get_item_list';
-  const query   = buildQuery(apiPath, accessToken, userId, shopId);
-  return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
+  if (shop_id) query = query.eq('shop_id', shop_id);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const rows = data || [];
+  const sum  = (key) => rows.reduce((a, r) => a + (r[key] || 0), 0);
+  const avg  = (key) => rows.length ? sum(key) / rows.length : 0;
+
+  return {
+    total_sessions:    rows.length,
+    total_views:       sum('total_views'),
+    total_unique:      sum('unique_viewers'),
+    total_orders:      sum('orders'),
+    total_gross_local: sum('gross_sales_local'),
+    total_net_local:   sum('net_sales_local'),
+    total_units_sold:  sum('units_sold'),
+    total_buyers:      sum('buyers'),
+    total_likes:       sum('likes'),
+    total_comments:    sum('comments'),
+    total_followers:   sum('new_followers'),
+    avg_duration_min:  Math.round(avg('duration_minutes')),
+    avg_orders:        (avg('orders')).toFixed(1),
+    avg_views:         Math.round(avg('total_views')),
+  };
 }
