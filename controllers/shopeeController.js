@@ -90,17 +90,23 @@ export async function authRefresh(req, res, next) {
 
 function getCredentials(req) {
   const access_token = req.headers['x-shopee-token'] || req.body?.access_token;
-  const user_id      = req.headers['x-shopee-user']  || req.body?.user_id;
-  return { access_token, user_id };
+  const user_id      = req.headers['x-shopee-user']  || req.body?.user_id  || '';
+  const shop_id      = req.headers['x-shopee-shop']  || req.body?.shop_id  || '';
+  return { access_token, user_id, shop_id };
 }
 
 function requireShopeeAuth(req, res) {
-  const { access_token, user_id } = getCredentials(req);
-  if (!access_token || !user_id) {
-    res.status(401).json({ error: 'Shopee access_token dan user_id diperlukan' });
+  const { access_token, user_id, shop_id } = getCredentials(req);
+  if (!access_token) {
+    res.status(401).json({ error: 'Shopee access_token diperlukan' });
     return null;
   }
-  return { access_token, user_id };
+  // Minimal butuh salah satu: user_id atau shop_id
+  if (!user_id && !shop_id) {
+    res.status(401).json({ error: 'Shopee user_id atau shop_id diperlukan' });
+    return null;
+  }
+  return { access_token, user_id, shop_id };
 }
 
 export async function sessionDetail(req, res, next) {
@@ -109,7 +115,7 @@ export async function sessionDetail(req, res, next) {
   const { session_id } = req.query;
   if (!session_id) return res.status(400).json({ error: 'session_id diperlukan' });
   try {
-    res.json(await getSessionDetail(session_id, creds.access_token, creds.user_id));
+    res.json(await getSessionDetail(session_id, creds.access_token, creds.user_id, creds.shop_id));
   } catch (err) { next(err); }
 }
 
@@ -119,7 +125,7 @@ export async function sessionMetric(req, res, next) {
   const { session_id } = req.query;
   if (!session_id) return res.status(400).json({ error: 'session_id diperlukan' });
   try {
-    res.json(await getSessionMetric(session_id, creds.access_token, creds.user_id));
+    res.json(await getSessionMetric(session_id, creds.access_token, creds.user_id, creds.shop_id));
   } catch (err) { next(err); }
 }
 
@@ -129,7 +135,7 @@ export async function sessionItemMetric(req, res, next) {
   const { session_id } = req.query;
   if (!session_id) return res.status(400).json({ error: 'session_id diperlukan' });
   try {
-    res.json(await getSessionItemMetric(session_id, creds.access_token, creds.user_id));
+    res.json(await getSessionItemMetric(session_id, creds.access_token, creds.user_id, creds.shop_id));
   } catch (err) { next(err); }
 }
 
@@ -139,7 +145,7 @@ export async function sessionComments(req, res, next) {
   const { session_id, last_comment_id } = req.query;
   if (!session_id) return res.status(400).json({ error: 'session_id diperlukan' });
   try {
-    res.json(await getLatestComments(session_id, creds.access_token, creds.user_id, last_comment_id));
+    res.json(await getLatestComments(session_id, creds.access_token, creds.user_id, creds.shop_id, last_comment_id));
   } catch (err) { next(err); }
 }
 
@@ -149,6 +155,6 @@ export async function sessionItems(req, res, next) {
   const { session_id } = req.query;
   if (!session_id) return res.status(400).json({ error: 'session_id diperlukan' });
   try {
-    res.json(await getItemList(session_id, creds.access_token, creds.user_id));
+    res.json(await getItemList(session_id, creds.access_token, creds.user_id, creds.shop_id));
   } catch (err) { next(err); }
 }

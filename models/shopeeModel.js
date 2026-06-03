@@ -47,11 +47,23 @@ function buildPublicQuery(apiPath) {
 
 /**
  * Build query string with common auth params (user/livestream endpoints)
+ * Base string: partner_id + api_path + timestamp + access_token + user_id
  */
 function buildUserQuery(apiPath, accessToken, userId) {
   const ts   = Math.floor(Date.now() / 1000);
   const sign = signUser(apiPath, ts, accessToken, userId);
   return `partner_id=${SHOPEE_PARTNER_ID}&timestamp=${ts}&access_token=${accessToken}&user_id=${userId}&sign=${sign}`;
+}
+
+/**
+ * Build query string — Shop-type endpoints (pakai shop_id)
+ * Base string: partner_id + api_path + timestamp + access_token + shop_id
+ */
+function buildShopQuery(apiPath, accessToken, shopId) {
+  const ts   = Math.floor(Date.now() / 1000);
+  const base = `${SHOPEE_PARTNER_ID}${apiPath}${ts}${accessToken}${shopId}`;
+  const sign = crypto.createHmac('sha256', SHOPEE_PARTNER_KEY).update(base).digest('hex');
+  return `partner_id=${SHOPEE_PARTNER_ID}&timestamp=${ts}&access_token=${accessToken}&shop_id=${shopId}&sign=${sign}`;
 }
 
 // ── Base fetch ────────────────────────────────────────
@@ -169,34 +181,44 @@ export async function refreshAccessToken(refreshToken, userId, shopId = null) {
 }
 
 // ── Livestream: Session ───────────────────────────────
+// Shopee Livestream API butuh user_id, tapi jika hanya punya shop_id
+// kita coba pakai shop_id sebagai user_id (beberapa endpoint support ini)
 
-export async function getSessionDetail(sessionId, accessToken, userId) {
+function buildQuery(apiPath, accessToken, userId, shopId) {
+  if (userId && userId !== '0' && userId !== '') {
+    return buildUserQuery(apiPath, accessToken, userId);
+  }
+  // Fallback: pakai shop_id
+  return buildShopQuery(apiPath, accessToken, shopId);
+}
+
+export async function getSessionDetail(sessionId, accessToken, userId, shopId = '') {
   const apiPath = '/api/v2/livestream/get_session_detail';
-  const query   = buildUserQuery(apiPath, accessToken, userId);
+  const query   = buildQuery(apiPath, accessToken, userId, shopId);
   return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
 }
 
-export async function getSessionMetric(sessionId, accessToken, userId) {
+export async function getSessionMetric(sessionId, accessToken, userId, shopId = '') {
   const apiPath = '/api/v2/livestream/get_session_metric';
-  const query   = buildUserQuery(apiPath, accessToken, userId);
+  const query   = buildQuery(apiPath, accessToken, userId, shopId);
   return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
 }
 
-export async function getSessionItemMetric(sessionId, accessToken, userId) {
+export async function getSessionItemMetric(sessionId, accessToken, userId, shopId = '') {
   const apiPath = '/api/v2/livestream/get_session_item_metric';
-  const query   = buildUserQuery(apiPath, accessToken, userId);
+  const query   = buildQuery(apiPath, accessToken, userId, shopId);
   return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
 }
 
-export async function getLatestComments(sessionId, accessToken, userId, lastCommentId = 0) {
+export async function getLatestComments(sessionId, accessToken, userId, shopId = '', lastCommentId = 0) {
   const apiPath = '/api/v2/livestream/get_latest_comment_list';
-  const query   = buildUserQuery(apiPath, accessToken, userId);
+  const query   = buildQuery(apiPath, accessToken, userId, shopId);
   const extra   = lastCommentId ? `&last_comment_id=${lastCommentId}` : '';
   return shopeeGet(apiPath, `${query}&session_id=${sessionId}${extra}`);
 }
 
-export async function getItemList(sessionId, accessToken, userId) {
+export async function getItemList(sessionId, accessToken, userId, shopId = '') {
   const apiPath = '/api/v2/livestream/get_item_list';
-  const query   = buildUserQuery(apiPath, accessToken, userId);
+  const query   = buildQuery(apiPath, accessToken, userId, shopId);
   return shopeeGet(apiPath, `${query}&session_id=${sessionId}`);
 }
