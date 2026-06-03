@@ -11,11 +11,21 @@ import { errorHandler }  from './middleware/errorHandler.js';
 
 const app = express();
 
+const ALLOWED_ORIGINS = [
+  'https://marketing-hub-fe.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? process.env.ALLOWED_ORIGIN || '*'
-    : '*',
+  origin: (origin, callback) => {
+    // allow requests with no origin (e.g. curl, Postman)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   methods: ['GET', 'POST'],
+  credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
 
@@ -27,8 +37,8 @@ app.use('/api', metaRoutes);
 app.use(errorHandler);
 
 // Local dev — jalankan server jika dipanggil langsung
-const isMain = process.argv[1]?.replace(/\\/g, '/').endsWith('app.js');
-if (isMain) {
+// VERCEL_ENV di-set otomatis oleh Vercel, jadi kita skip listen di sana
+if (!process.env.VERCEL) {
   const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => {
     console.log(`\n🚀 Backend running → http://localhost:${PORT}`);
