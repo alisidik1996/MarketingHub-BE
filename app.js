@@ -21,21 +21,27 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Allow no-origin requests (curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-    callback(new Error(`CORS: origin ${origin} not allowed`));
+    // Jangan throw Error — return false agar CORS header tidak di-set
+    // tapi juga tidak crash serverless function
+    return callback(null, false);
   },
   methods: ['GET', 'POST'],
   credentials: true,
 }));
-app.use(express.json({ limit: '10mb' })); // lebih besar untuk upload xlsx
 
-// Rate limit: 60 requests per menit per IP
-app.use(rateLimit(60, 60_000));
+// Handle CORS preflight OPTIONS secara eksplisit
+app.options('*', cors());
+app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
+
+// Rate limit setelah CORS dan health check
+app.use(rateLimit(60, 60_000));
 
 app.use('/api/meta',   metaRoutes);
 app.use('/api/shopee', shopeeRoutes);
