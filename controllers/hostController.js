@@ -4,8 +4,17 @@
 import { getAllHosts, createHost, updateHost, deleteHost } from '../models/hostModel.js';
 
 export async function listHosts(req, res, next) {
-  try { res.json(await getAllHosts()); }
-  catch (err) { next(err); }
+  try {
+    console.log('[Host] GET - SUPABASE_URL:', process.env.SUPABASE_URL ? 'set' : 'NOT SET');
+    console.log('[Host] GET - SUPABASE_SERVICE_KEY:', process.env.SUPABASE_SERVICE_KEY ? 'set' : 'NOT SET');
+    const result = await getAllHosts();
+    console.log('[Host] GET success, count:', result.length);
+    res.json(result);
+  }
+  catch (err) {
+    console.error('[Host] GET error:', err.message, err.stack);
+    next(err);
+  }
 }
 
 export async function addHost(req, res, next) {
