@@ -28,7 +28,7 @@ app.use(cors({
     // tapi juga tidak crash serverless function
     return callback(null, false);
   },
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
 

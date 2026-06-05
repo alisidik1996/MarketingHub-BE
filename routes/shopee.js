@@ -9,8 +9,8 @@ import {
   getSession,
   getSummary,
 } from '../controllers/shopeeController.js';
+import { listHosts, addHost, editHost, removeHost } from '../controllers/hostController.js';
 
-// Simpan file di memory (tidak ke disk) — max 10MB
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 10 * 1024 * 1024 },
@@ -25,9 +25,16 @@ const upload = multer({
 
 const router = Router();
 
-router.post('/upload',           upload.single('file'), uploadReport);
-router.get('/sessions',          listSessions);
+// Sessions
+router.post('/upload',             upload.single('file'), uploadReport);
+router.get('/sessions',            listSessions);
 router.get('/sessions/:sessionId', getSession);
-router.get('/summary',           getSummary);
+router.get('/summary',             getSummary);
+
+// Hosts CRUD
+router.get('/hosts',       listHosts);
+router.post('/hosts',      addHost);
+router.put('/hosts/:id',   editHost);
+router.delete('/hosts/:id',removeHost);
 
 export default router;
