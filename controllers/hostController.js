@@ -9,8 +9,14 @@ export async function listHosts(req, res, next) {
 }
 
 export async function addHost(req, res, next) {
-  try { res.status(201).json(await createHost(req.body)); }
-  catch (err) { next(err); }
+  try {
+    console.log('[Host] POST body:', req.body);
+    res.status(201).json(await createHost(req.body));
+  }
+  catch (err) {
+    console.error('[Host] POST error:', err.message);
+    next(err);
+  }
 }
 
 export async function editHost(req, res, next) {
