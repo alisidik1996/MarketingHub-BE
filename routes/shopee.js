@@ -9,7 +9,11 @@ import {
   getSession,
   getSummary,
 } from '../controllers/shopeeController.js';
-import { listHosts, addHost, editHost, removeHost } from '../controllers/hostController.js';
+import { listHosts, addHost, editHost, removeHost,
+         sessionHosts, assignSessionHost, unassignSessionHost, sessionHostMap }
+  from '../controllers/hostController.js';
+
+// ...existing imports above stay the same
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -36,5 +40,11 @@ router.get('/hosts',       listHosts);
 router.post('/hosts',      addHost);
 router.put('/hosts/:id',   editHost);
 router.delete('/hosts/:id',removeHost);
+
+// Session ↔ Host Assignment
+router.get('/session-hosts',                          sessionHostMap);
+router.get('/sessions/:sessionId/hosts',              sessionHosts);
+router.post('/sessions/:sessionId/hosts',             assignSessionHost);
+router.delete('/sessions/:sessionId/hosts/:hostId',   unassignSessionHost);
 
 export default router;
