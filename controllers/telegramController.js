@@ -14,15 +14,27 @@ export async function webhook(req, res) {
   // Always respond 200 immediately to Telegram
   res.sendStatus(200);
 
-  const token   = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  console.log('[TG Webhook] Received update, token configured:', !!token);
+
+  if (!token) {
+    console.warn('[TG Webhook] TELEGRAM_BOT_TOKEN not set in env');
+    return;
+  }
 
   const update  = req.body;
+  console.log('[TG Webhook] Update type:', Object.keys(update).filter(k => k !== 'update_id').join(','));
+
   const message = update.message || update.channel_post;
-  if (!message) return;
+  if (!message) {
+    console.log('[TG Webhook] No message in update');
+    return;
+  }
+
+  console.log('[TG Webhook] Message from:', message.from?.username || message.from?.first_name, '| text:', message.text?.slice(0, 80));
 
   processMessage(token, message).catch(err =>
-    console.error('[TG webhook error]', err.message)
+    console.error('[TG processMessage error]', err.message)
   );
 }
 
