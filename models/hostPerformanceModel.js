@@ -74,7 +74,7 @@ export async function getHostPerformance({ since = '', until = '' } = {}) {
     h.sessions.push(sess.session_id);
   });
 
-  // Hitung averages dan score
+  // Hitung averages — sort by total_net desc (Net Sales terbanyak = terbaik)
   return Object.values(hostMap).map(h => {
     const n = h.total_sessions || 1;
     return {
@@ -82,18 +82,11 @@ export async function getHostPerformance({ since = '', until = '' } = {}) {
       avg_views:    Math.round(h.total_views    / n),
       avg_orders:   +(h.total_orders  / n).toFixed(1),
       avg_gross:    +(h.total_gross   / n).toFixed(0),
+      avg_net:      +(h.total_net     / n).toFixed(0),
       avg_duration: +(h.total_duration/ n).toFixed(0),
       avg_cr:       h.total_unique > 0
         ? +((h.total_buyers / h.total_unique) * 100).toFixed(2)
         : 0,
-      // Performance score: weighted composite
-      // orders (40%) + gross (30%) + views (20%) + followers (10%)
-      score: +(
-        (h.total_orders   / n) * 40 +
-        (h.total_gross    / n) * 0.001 * 30 +
-        (h.total_views    / n) * 0.01  * 20 +
-        (h.total_followers/ n) * 10
-      ).toFixed(1),
     };
-  }).sort((a, b) => b.score - a.score);
+  }).sort((a, b) => b.total_net - a.total_net);
 }
