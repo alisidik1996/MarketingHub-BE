@@ -8,6 +8,7 @@ import express from 'express';
 import cors    from 'cors';
 import metaRoutes        from './routes/meta.js';
 import shopeeRoutes      from './routes/shopee.js';
+import botRoutes         from './routes/bot.js';
 import { errorHandler }  from './middleware/errorHandler.js';
 import { rateLimit }     from './middleware/rateLimit.js';
 
@@ -45,6 +46,7 @@ app.use(rateLimit(60, 60_000));
 
 app.use('/api/meta',   metaRoutes);
 app.use('/api/shopee', shopeeRoutes);
+app.use('/api/bot',    botRoutes);
 app.use(errorHandler);
 
 if (!process.env.VERCEL) {
