@@ -57,3 +57,13 @@ export async function sessionHostMap(req, res, next) {
   try { res.json(await getAllSessionHostMap()); }
   catch (err) { next(err); }
 }
+
+// ── Host Performance ──────────────────────────────────
+import { getHostPerformance } from '../models/hostPerformanceModel.js';
+
+export async function hostPerformance(req, res, next) {
+  try {
+    const { since, until } = req.query;
+    res.json(await getHostPerformance({ since: since||'', until: until||'' }));
+  } catch (err) { next(err); }
+}
