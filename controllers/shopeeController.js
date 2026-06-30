@@ -228,8 +228,16 @@ export async function getAdsBalance(_req, res, next) {
     const response = await fetch(url);
     const data = await response.json();
 
+    const balance =
+      data?.balance ||
+      data?.data?.balance ||
+      data?.total_balance ||
+      data?.data?.total_balance ||
+      0;
+
     res.json({
       success: true,
+      balance: Number(balance),
       data,
     });
   } catch (err) { next(err); }
