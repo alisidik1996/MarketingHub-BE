@@ -182,7 +182,7 @@ export async function getAuthUrl(_req, res, next) {
       .digest('hex');
 
     const authUrl =
-      `${SHOPEE_AUTH_BASE}${path}` +
+      `https://partner.shopeemobile.com${path}` +
       `?partner_id=${SHOPEE_PARTNER_ID}` +
       `&timestamp=${timestamp}` +
       `&sign=${sign}` +
