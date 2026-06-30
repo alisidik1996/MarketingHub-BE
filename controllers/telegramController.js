@@ -71,6 +71,21 @@ export async function manualSend(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// GET /api/bot/telegram/status
+// Check webhook status directly from Telegram
+export async function webhookStatus(req, res, next) {
+  const token = req.query.token || process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return res.status(400).json({ error: 'token diperlukan (query param atau env)' });
+  try {
+    const r    = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+    const data = await r.json();
+    res.json({
+      env_token_set: !!process.env.TELEGRAM_BOT_TOKEN,
+      webhook_info:  data,
+    });
+  } catch (err) { next(err); }
+}
+
 // GET /api/bot/telegram/messages
 // Get logged session messages
 export async function getMessages(req, res, next) {

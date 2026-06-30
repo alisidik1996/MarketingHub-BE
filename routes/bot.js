@@ -8,6 +8,7 @@ import {
   removeWebhook,
   manualSend,
   getMessages,
+  webhookStatus,
 } from '../controllers/telegramController.js';
 
 const router = Router();
@@ -17,5 +18,6 @@ router.post('/telegram/setup-webhook',  setupWebhook);
 router.post('/telegram/remove-webhook', removeWebhook);
 router.post('/telegram/send',           manualSend);
 router.get('/telegram/messages',        getMessages);
+router.get('/telegram/status',          webhookStatus);
 
 export default router;
