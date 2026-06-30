@@ -233,6 +233,8 @@ export async function getAdsBalance(_req, res, next) {
       data?.data?.balance ||
       data?.total_balance ||
       data?.data?.total_balance ||
+      data?.response?.total_balance ||
+      data?.response?.data?.total_balance ||
       0;
 
     res.json({
