@@ -240,8 +240,49 @@ export async function authCallback(req, res, next) {
   try {
     const { shop_id, code } = req.query;
 
-    integrationStore.shopId = shop_id || '';
-    integrationStore.accessToken = code || '';
+    if (!code || !shop_id) {
+      throw new Error('Code atau shop_id tidak ditemukan');
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const path = '/api/v2/auth/token/get';
+
+    const baseString = `${SHOPEE_PARTNER_ID}${path}${timestamp}`;
+    const sign = crypto
+      .createHmac('sha256', SHOPEE_PARTNER_KEY)
+      .update(baseString)
+      .digest('hex');
+
+    const tokenRes = await fetch(
+      `${SHOPEE_BASE}${path}` +
+      `?partner_id=${SHOPEE_PARTNER_ID}` +
+      `&timestamp=${timestamp}` +
+      `&sign=${sign}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code,
+          partner_id: SHOPEE_PARTNER_ID,
+          shop_id: Number(shop_id),
+        }),
+      }
+    );
+
+    const tokenData = await tokenRes.json();
+
+    if (!tokenData.access_token) {
+      throw new Error(
+        tokenData.message || 'Gagal mendapatkan access token Shopee'
+      );
+    }
+
+    integrationStore.partnerId = String(SHOPEE_PARTNER_ID);
+    integrationStore.shopId = String(shop_id);
+    integrationStore.accessToken = tokenData.access_token || '';
+    integrationStore.refreshToken = tokenData.refresh_token || '';
     integrationStore.updatedAt = new Date().toISOString();
 
     res.send(`
@@ -253,8 +294,10 @@ export async function authCallback(req, res, next) {
             window.opener && window.opener.postMessage(
               {
                 type: 'SHOPEE_AUTH_SUCCESS',
+                partnerId: '${SHOPEE_PARTNER_ID}',
                 shopId: '${shop_id || ''}',
-                code: '${code || ''}'
+                accessToken: '${'${integrationStore.accessToken}'}',
+                refreshToken: '${'${integrationStore.refreshToken}'}'
               },
               '*'
             );
