@@ -12,6 +12,7 @@ import {
 import crypto from 'crypto';
 import {
   SHOPEE_AUTH_BASE,
+  SHOPEE_BASE,
   SHOPEE_PARTNER_ID,
   SHOPEE_PARTNER_KEY,
   SHOPEE_REDIRECT_URI,
@@ -191,6 +192,45 @@ export async function getAuthUrl(_req, res, next) {
     res.json({
       success: true,
       authUrl,
+    });
+  } catch (err) { next(err); }
+}
+
+// GET /api/shopee/auth/callback
+export async function getAdsBalance(_req, res, next) {
+  try {
+    if (!integrationStore.accessToken || !integrationStore.shopId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Shopee belum terhubung',
+      });
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const path = '/api/v2/ads/get_total_balance';
+
+    const baseString =
+      `${SHOPEE_PARTNER_ID}${path}${timestamp}${integrationStore.accessToken}${integrationStore.shopId}`;
+
+    const sign = crypto
+      .createHmac('sha256', SHOPEE_PARTNER_KEY)
+      .update(baseString)
+      .digest('hex');
+
+    const url =
+      `${SHOPEE_BASE}${path}` +
+      `?partner_id=${SHOPEE_PARTNER_ID}` +
+      `&timestamp=${timestamp}` +
+      `&access_token=${integrationStore.accessToken}` +
+      `&shop_id=${integrationStore.shopId}` +
+      `&sign=${sign}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    res.json({
+      success: true,
+      data,
     });
   } catch (err) { next(err); }
 }

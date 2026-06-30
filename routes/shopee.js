@@ -13,6 +13,7 @@ import {
   testIntegration,
   refreshIntegrationToken,
   getAuthUrl,
+  getAdsBalance,
   authCallback,
 } from '../controllers/shopeeController.js';
 import {
@@ -65,6 +66,7 @@ router.post('/integration/refresh', refreshIntegrationToken);
 
 // Shopee OAuth
 router.get('/auth/url', getAuthUrl);
+router.get('/ads/balance', getAdsBalance);
 router.get('/auth/callback', authCallback);
 
 export default router;
