@@ -296,8 +296,8 @@ export async function authCallback(req, res, next) {
                 type: 'SHOPEE_AUTH_SUCCESS',
                 partnerId: '${SHOPEE_PARTNER_ID}',
                 shopId: '${shop_id || ''}',
-                accessToken: '${'${integrationStore.accessToken}'}',
-                refreshToken: '${'${integrationStore.refreshToken}'}'
+                accessToken: '${integrationStore.accessToken}',
+                refreshToken: '${integrationStore.refreshToken}'
               },
               '*'
             );
